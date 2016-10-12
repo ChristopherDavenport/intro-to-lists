@@ -21,15 +21,38 @@
 class: center, middle
 
 # Intro To Lists and Data Structures
-Chris Davenport • `@davenpcm` • Eckerd College
+Chris Davenport • `@christopherdavenport` • Eckerd College
+
+???
+
+- I'm a self-taught programmer.
+
+---
+# Attributions
+
+- I want to make sure I thank the authors of [Functional Programming in Scala](https://www.manning.com/books/functional-programming-in-scala)
+for their ideas and hard work. Most of the problem content was found in their book.
+- I want to thank Eckerd for hosting us and for allowing us to get together to
+discuss these topics.
+- I want to thank Frank Abney for supporting me as I went through the learning
+process and helping me bring what I've learned to an engaging environment.
 
 ---
 
-# Lists
+# Goals
 
-1. Foundational Understanding
-2. Examine Reasoning By Types
-3. Build Our Own Version
+1. Definining Functional Data Structures
+2. Pattern Matching
+3. Data Sharing
+4. Recursion
+5. Generalization To Higher Ordered Functions
+6. Handling Efficiency
+7. Quick Binary Tree Similarities
+
+#### Imports
+```scala
+import scala.annotation.tailrec
+```
 
 ---
 
@@ -39,6 +62,815 @@ sealed trait List[+A]
 case object Nil extends List[Nothing]
 final case class Cons[+A](x: A, xs: List[A]) extends List[A]
 ```
+
+However for our understanding lets try defining it differently
+
+```scala
+sealed trait ListC[+A]
+final case object El extends ListC[Nothing]
+final case class Nel[+A](head: A, tail: ListC[A]) extends ListC[A]
+
+object ListC {
+  def apply[A](as: A*): ListC[A] =
+    if (as.isEmpty) El
+    else Nel(as.head, apply(as.tail: _*))
+}
+```
+
+???
+
+This implies both and Empty List and a Non Empty Lists and that we can look at
+them diferently
+
+---
+
+# Underlying Structure
+
+---
+
+# Pattern Matching
+```scala
+val x = ListC(1,2,3,4,5) match {
+  case Nel(x, Nel(2, Nel(4, _))) => x
+  case El => 42
+  case Nel(x, Nel(y, Nel(3, Nel(4, _)))) => x + y
+  case Nel(h, t) => h
+  case _ => 101
+}
+```
+
+---
+
+# Pattern Matching
+```scala
+val x = ListC(1,2,3,4,5) match {
+  case Nel(x, Nel(2, Nel(4, _))) => x
+  case El => 42
+  case Nel(x, Nel(y, Nel(3, Nel(4, _)))) => x + y
+  case Nel(h, t) => h
+  case _ => 101
+}
+```
+```scala
+scala> val x = ListC(1,2,3,4,5) match {
+     |   case Nel(x, Nel(2, Nel(4, _))) => x
+     |   case El => 42
+     |   case Nel(x, Nel(y, Nel(3, Nel(4, _)))) => x + y
+     |   case Nel(h, t) => h
+     |   case _ => 101
+     | }
+x: Int = 3
+```
+
+---
+
+# Pattern Matching Equivalency
+```scala
+scala> val nel = Nel(1,Nel(2, Nel(3, Nel(4, Nel(5, El)))))
+nel: Nel[Int] = Nel(1,Nel(2,Nel(3,Nel(4,Nel(5,El)))))
+
+scala> val list = ListC(1,2,3,4,5)
+list: ListC[Int] = Nel(1,Nel(2,Nel(3,Nel(4,Nel(5,El)))))
+
+scala> nel == list
+res1: Boolean = true
+```
+
+---
+
+# Exercise 2
+- Implement Function tail removing the first element of the list
+- Should take constant time
+- What should we do if the List is empty?
+
+```scala
+  def tail[A](list: ListC[A]) = ???
+```
+
+---
+# Exercise 2
+- Pattern match for elements
+- Generate errors for elements that don't satisfy what we are looking for
+
+#### Option 1
+```scala
+scala> def tail[A](list: ListC[A]): ListC[A] = list match {
+     |   case El => throw new Exception("Cannot take tail of Empty List")
+     |   case Nel(head, tail) => tail
+     | }
+tail: [A](list: ListC[A])ListC[A]
+```
+```scala
+scala> tail(ListC(1,2,3))
+res2: ListC[Int] = Nel(2,Nel(3,El))
+```
+```scala
+scala> tail(ListC())
+java.lang.Exception: Cannot take tail of Empty List
+  at .tail(<console>:20)
+  ... 762 elided
+```
+---
+# Exercise 2
+- Same pattern matching however now we indicate that this function can fail
+
+#### Option 2
+```scala
+scala> def tail[A](list: ListC[A]): Option[ListC[A]] = list match {
+     |   case El => Option.empty[ListC[A]]
+     |   case Nel(head, tail) => Option(tail)
+     | }
+tail: [A](list: ListC[A])Option[ListC[A]]
+```
+```scala
+scala> tail(ListC(1,2,3))
+res4: Option[ListC[Int]] = Some(Nel(2,Nel(3,El)))
+
+scala> tail(ListC())
+res5: Option[ListC[Nothing]] = None
+```
+
+---
+# Exercise 2
+- What if we act as though it is an iterator and the tail of an empty list
+is still the empty list?
+
+### Option 3
+```scala
+scala> def tail[A](list: ListC[A]): ListC[A] = list match {
+     |   case El => El
+     |   case Nel(head, tail) => tail
+     | }
+tail: [A](list: ListC[A])ListC[A]
+```
+```scala
+scala> tail(ListC(1,2,3))
+res6: ListC[Int] = Nel(2,Nel(3,El))
+
+scala> tail(ListC())
+res7: ListC[Nothing] = El
+
+scala> tail(ListC()) == tail(ListC(1))
+res8: Boolean = true
+```
+
+---
+# Exercise 3
+
+#### Change the head of the list
+
+```scala
+def setHead[A](list: ListC[A]): ListC[A] = ???
+```
+
+---
+# Exercise 3
+
+#### Change the head of the list
+
+```scala
+scala> def setHead[A](list: ListC[A])(newHead: A): ListC[A] = list match {
+     |   case El => ListC(newHead)
+     |   case Nel(head, tail) => Nel(newHead, tail)
+     | }
+setHead: [A](list: ListC[A])(newHead: A)ListC[A]
+
+scala> val setHeadList1 = ListC(1,2,3,4,5)
+setHeadList1: ListC[Int] = Nel(1,Nel(2,Nel(3,Nel(4,Nel(5,El)))))
+
+scala> val setHeadList2 = setHead(setHeadList1)(5)
+setHeadList2: ListC[Int] = Nel(5,Nel(2,Nel(3,Nel(4,Nel(5,El)))))
+
+scala> tail(setHeadList1) equals tail(setHeadList2)
+res9: Boolean = true
+```
+
+- This allows efficient data sharing.
+- Now l1 and l2 share the underlying data of 2,3,4,5
+
+???
+If we look how does this apply to list of N length.
+
+---
+# Exercise 4
+
+```scala
+def drop[A](l: List[A])(n: Int): List[A]
+```
+- Recursive Implementations
+
+???
+
+- Recursive Implementations are now capable and simple
+- No possibility to lose data
+- Constant Time means n time for drop leaving original data in place
+for other uses
+
+---
+# Exercise 4
+```scala
+def drop[A](l: List[A])(n: Int): List[A]
+```
+```scala
+scala> @tailrec
+     | def drop[A](l: ListC[A])(n: Int): ListC[A] = n match {
+     |   case zeroOrLess if zeroOrLess <= 0 => l
+     |   case greaterThanZero if greaterThanZero > 0 => drop(tail(l))(n-1)
+     | }
+drop: [A](l: ListC[A])(n: Int)ListC[A]
+
+scala> drop(ListC("I", "want", "to", "be", "a", "crocodile"))(4)
+res10: ListC[String] = Nel(a,Nel(crocodile,El))
+
+scala> drop(ListC("I", "want", "to", "be", "a", "crocodile"))(9)
+res11: ListC[String] = El
+
+scala> drop(ListC("I", "want", "to", "be", "a", "crocodile"))(-1)
+res12: ListC[String] = Nel(I,Nel(want,Nel(to,Nel(be,Nel(a,Nel(crocodile,El))))))
+```
+---
+# Exercise 5
+```scala
+def dropWhile[A](l: ListC[A])(f: A => Boolean): ListC[A]
+```
+- Removes elements from the Lists prefix as long as the match the predicate.
+- Do we need tails here?
+
+---
+Exercise 5
+```scala
+def dropWhile[A](l: ListC[A])(f: A => Boolean): ListC[A]
+```
+```scala
+scala> @tailrec
+     |  def dropWhile[A](l: ListC[A])(f: A => Boolean): ListC[A] = l match {
+     |    case El => El
+     |    case Nel(x, xs) if f(x) => dropWhile(xs)(f)
+     |    case _ => l
+     |  }
+dropWhile: [A](l: ListC[A])(f: A => Boolean)ListC[A]
+ ```
+
+- Are any patterns starting to emerge about how to handle data in this type?
+
+---
+# Considerations on Lists
+
+1. Access to members of the list from the front is constant
+2. Access to members of the rear of the list is linear to the length
+of the list.
+3. Lists consist of an algebra of either 0 elements or any number of elements
+0-∞. (Although your physical resources might disagree with you)
+
+---
+# Combining Lists
+```scala
+def append[A](l1: ListC[A])(l2: ListC[A]): ListC[A]
+```
+
+
+???
+- Remember that since each is logically attached a full copy of l1 must be made
+to attach l2
+
+---
+# Combining Lists
+```scala
+def append[A](l1: ListC[A])(l2: ListC[A]): ListC[A]
+```
+```scala
+scala> def append[A](l1: ListC[A])(l2: ListC[A]): ListC[A] = l1 match {
+     |   case El => l2
+     |   case Nel(head, tail) => Nel(head, append(tail)(l2))
+     | }
+append: [A](l1: ListC[A])(l2: ListC[A])ListC[A]
+```
+- What is linking a list in terms of memory
+- What happens to the first list?
+- Remember this guy we'll come back to him.
+
+---
+# Removing Last Elements
+```scala
+def init[A](l: ListC[A]): ListC[A]
+```
+```scala
+init(ListC(1,2,3,4)) == ListC(1,2,3)
+```
+
+---
+# Removing Last Elements
+```scala
+def init[A](l: ListC[A]): ListC[A]
+```
+```scala
+scala> def init[A](l: ListC[A]): ListC[A] = l match {
+     |   case El => El
+     |   case Nel(head, El) => El
+     |   case Nel(head, tail) => Nel(head, init(tail))
+     | }
+init: [A](l: ListC[A])ListC[A]
+```
+```scala
+scala> init(ListC(1,2,3,4)) == ListC(1,2,3)
+res13: Boolean = true
+```
+---
+# Generalizing Traversal
+
+- All these functions move through the list and are taking N time
+- They are evaluating elements and returning a singular object
+- Currently Stack Safety isn't being upheld( We'll look at that later )
+
+- This time we will need two types as demonstration of the internal elements
+ability to change through the merging process.
+
+---
+# Folding
+
+- Lets Generalize this traversal over the elements of the list starting from
+the first element and then continuing to the last.
+
+```scala
+  def foldRight[A,B](l: ListC[A])(z: B)(f: (A, B) => B ): B
+```
+
+- l : The list we are folding over
+- z : The "zero" element that is placed at the end of the traversal
+- f : A function which takes the zero element and combines it  with the next
+element and then continues the folding process.
+
+Lets Look back at the definition of append
+```scala
+scala> def append[A](l1: ListC[A])(l2: ListC[A]): ListC[A] = l1 match {
+     |   case El => l2
+     |   case Nel(head, tail) => Nel(head, append(tail)(l2))
+     | }
+append: [A](l1: ListC[A])(l2: ListC[A])ListC[A]
+```
+
+---
+# Folding
+```scala
+  def foldRight[A,B](l: List[A])(z: B)(f: (A, B) => B ): B
+```
+
+
+```scala
+scala> def append[A](l1: ListC[A])(l2: ListC[A]): ListC[A] = l1 match {
+     |   case El => l2
+     |   case Nel(head, tail) => Nel(head, append(tail)(l2))
+     | }
+append: [A](l1: ListC[A])(l2: ListC[A])ListC[A]
+```
+
+```scala
+scala> def foldRight[A,B](l: ListC[A])(z: B)(f: (A, B) => B ) : B = l match {
+     |   case El => z
+     |   case Nel(head, tail) => f(head, foldRight(tail)(z)(f))
+     | }
+foldRight: [A, B](l: ListC[A])(z: B)(f: (A, B) => B)B
+```
+#### Yowza!
+
+#### Let's see how long our list is!
+
+---
+# Counting Through Abstraction
+```scala
+def length[A](l: ListC[A]): Int
+```
+####Such that
+```scala
+length(ListC(1,2,3)) == 3
+length(ListC()) == 0
+```
+---
+# Counting Through Abstraction
+```scala
+scala> def length[A](l: ListC[A]): Int = foldRight(l)(0)((_, b) => 1 + b)
+length: [A](l: ListC[A])Int
+```
+#### Did that work?
+```scala
+scala> length(ListC(1,2,3)) == 3
+res14: Boolean = true
+
+scala> length(ListC()) == 0
+res15: Boolean = true
+```
+
+---
+# Breaking It Down
+```scala
+scala> def length[A](l: ListC[A]): Int = foldRight(l)(0)((_, b) => 1 + b)
+length: [A](l: ListC[A])Int
+```
+```scala
+scala>  length(ListC(1,2,3))
+res16: Int = 3
+
+scala>  foldRight(Nel(1,Nel(2,Nel(3,El))))(0)((_, b) => 1 + b)
+res17: Int = 3
+
+scala>  1 + foldRight(Nel(2,Nel(3,El)))(0)((_, b) => 1 + b)
+res18: Int = 3
+
+scala>  1 + 1 + foldRight(Nel(3, El))(0)((_, b) => 1 + b)
+res19: Int = 3
+
+scala>  1 + 1 + 1 + foldRight(El)(0)((_, b) => 1 + b)
+<console>:22: warning: dead code following this construct
+        1 + 1 + 1 + foldRight(El)(0)((_, b) => 1 + b)
+                                            ^
+res20: Int = 3
+
+scala>  1 + 1 + 1 + 0
+res21: Int = 3
+
+scala>  3
+res22: Int = 3
+```
+---
+# FoldRight Summary
+
+1. We are traversing the list and applying the function to the aggregate of the
+head and the tail
+2. We are applying the z element in the position of the empty list and then
+f can aggregate outwards from the El position.
+  - If you think of the list going left to right you see why this is called
+  fold right then. As it folds outwards from the El
+
+#### What if we have a really long list though?
+
+# BOOM!
+#### Stack Overflow Error
+
+---
+# Tail Recursive Folding
+
+- We don't want our program to blow up on big lists.
+- So lets implement a tail recursive folding implementation that will
+keep stack frames from overflowing
+- This time we'll call it fold left
+
+---
+# Folding With Safety
+
+```scala
+  @tailrec def foldLeft[A,B])(l: ListC[A])(z: B)(f: (B, A) => B): B
+```
+
+- What if we work from the other side of the list?
+- How would that fold into itself?
+
+---
+# Folding With Safety
+
+```scala
+  @tailrec def foldLeft[A,B])(l: ListC[A])(z: B)(f: (B, A) => B): B
+```
+
+- What if we work from the other side of the list?
+- How would that fold into itself?
+
+```scala
+scala> @tailrec def foldLeft[A,B](l: ListC[A])(z: B)(f: (B, A) => B): B =
+     | l match {
+     |     case Nel(head, tail) => foldLeft(tail)(f(z, head))(f)
+     |     case El => z
+     | }
+foldLeft: [A, B](l: ListC[A])(z: B)(f: (B, A) => B)B
+```
+
+- What is difference about foldLeft and foldRight?
+
+---
+# Reversing Our List
+
+- Our list is backwards and we want to get it forwards.
+
+```scala
+def reverse[A](l: ListC[A]): ListC[A]
+```
+
+Such That
+```scala
+reverse(ListC(1,2,3)) == ListC(3,2,1)
+```
+
+- Type Signature isnt going to be much help
+- Must mean we need to use the internal nature of a list.
+
+---
+# Reversing Out List
+
+```scala
+def reverse[A](l: ListC[A]): ListC[A]
+```
+- Implementation
+
+```scala
+def reverse[A](l: ListC[A]): ListC[A] =
+  foldLeft(l)(ListC[A]())((b: ListC[A], a: A) => Nel(a, b))
+```
+
+- Test
+
+```scala
+scala> reverse(ListC(1,2,3)) == ListC(3,2,1)
+res23: Boolean = true
+```
+
+---
+# Reversing Our List - Investigation
+
+```scala
+scala> reverse(ListC(1,2,3))
+res24: ListC[Int] = Nel(3,Nel(2,Nel(1,El)))
+
+scala> foldLeft(ListC(1,2,3))(ListC[Int]())((b, a) => Nel(a, b))
+res25: ListC[Int] = Nel(3,Nel(2,Nel(1,El)))
+
+scala> foldLeft(ListC(2,3))(ListC(1))((b,a) => Nel(a,b))
+res26: ListC[Int] = Nel(3,Nel(2,Nel(1,El)))
+
+scala> foldLeft(ListC(3))(ListC(2,1))((b,a) => Nel(a,b))
+res27: ListC[Int] = Nel(3,Nel(2,Nel(1,El)))
+
+scala> foldLeft(El)(ListC(3,2,1))((b,a) => Nel(a,b))
+<console>:22: warning: dead code following this construct
+       foldLeft(El)(ListC(3,2,1))((b,a) => Nel(a,b))
+                                               ^
+<console>:22: warning: dead code following this construct
+       foldLeft(El)(ListC(3,2,1))((b,a) => Nel(a,b))
+                                        ^
+res28: ListC[Int] = Nel(3,Nel(2,Nel(1,El)))
+
+scala> ListC(3,2,1)
+res29: ListC[Int] = Nel(3,Nel(2,Nel(1,El)))
+```
+
+---
+# Ending Stack Breakage
+
+- Let's Implement foldRight in terms of foldLeft.
+- The signature again was
+
+```scala
+def foldRightViaFoldLeft[A,B](l: ListC[A])(z: B)(f: (A, B) => B): B
+```
+
+- Think about folding like rolling a newspaper
+
+---
+# Ending Stack Breakage
+
+```scala
+def foldRight[A,B](l: ListC[A])(z: B)(f: (A, B) => B): B
+```
+
+```scala
+def foldRight[A,B](l: ListC[A])(z: B)(f: (A, B) => B): B =
+  foldLeft(reverse(l))(z)((b, a) => f(a, b))
+```
+
+- Lets Test - If applying Nel to foldLeft reversed the list what would happen
+with fold right.
+
+```scala
+scala> foldRight(ListC(1,2,3))(ListC[Int]())((a,b) => Nel(a, b))
+res30: ListC[Int] = Nel(1,Nel(2,Nel(3,El)))
+```
+
+---
+# Making Lists from Lists
+
+- Earlier we did some complex pattern matching in order to append to list
+together. Lets use foldRight to make it much easier
+
+```scala
+def append[A](l1: ListC[A])(l2: ListC[A]): ListC[A]
+```
+
+- Such That
+
+```scala
+append(ListC(1,2,3))(ListC(4,5,6)) == ListC(1,2,3,4,5,6)
+```
+
+- We used this as an example of foldRight earlier.
+- Where would we place the "zero" element in foldRight
+
+---
+# Making Lists from Lists
+
+- Earlier we did some complex pattern matching in order to append to list
+together. Lets use foldRight to make it much easier
+
+```scala
+def append[A](l1: ListC[A])(l2: ListC[A]): ListC[A]
+```
+- Implementation
+
+```scala
+def append[A](l1: ListC[A])(l2: ListC[A]): ListC[A] =
+  foldRight(l1)(l2)(Nel(_,_))
+```
+
+- Test
+
+```scala
+scala> append(ListC(1,2,3))(ListC(4,5,6)) == ListC(1,2,3,4,5,6)
+res31: Boolean = true
+```
+
+---
+# Too Much of a Good Thing
+
+- Let us now assume that we have a List of Lists and really we just need a
+a single list.
+- How can we yank our lists out?
+- Pesky empty lists get in the way.
+
+```scala
+def flatten[A](l: ListC[ListC[A]]): ListC[A]
+```
+Such That
+
+```scala
+flatten(ListC(ListC(1,2),ListC(3),ListC(4,5))) == ListC(1,2,3,4,5)
+```
+
+---
+# Too Much of a Good Thing
+
+- Let us now assume that we have a List of Lists and really we just need a
+a single list.
+- How can we yank our lists out?
+- Pesky empty lists get in the way.
+
+```scala
+scala> val f : Int => Int => Int = a => b => a + b
+f: Int => (Int => Int) = <function1>
+
+scala> Function.uncurried(f)
+res32: (Int, Int) => Int = <function2>
+```
+
+- Implementation
+
+```scala
+def flatten[A](l: ListC[ListC[A]]): ListC[A] =
+  foldRight(l)(ListC[A]())(Function.uncurried(append))
+```
+
+- Testing
+
+```scala
+scala> flatten(ListC(ListC(1,2),ListC(3),ListC(4,5))) == ListC(1,2,3,4,5)
+res33: Boolean = true
+```
+
+---
+# Transforming Lists
+
+- Now that we have a way to build lists with foldRight wouldn't it be
+convenient if we could arbitrarily transform those lists
+
+- Lets Build These
+
+```scala
+def map[A,B](l: ListC[A])(f: A => B): ListC[B]
+def filter[A](l: ListC[A])(f: A => Boolean): ListC[A]
+def flatMap[A, B](l: ListC[A])(f: A => ListC[B]): ListC[B]
+```
+
+---
+# Map
+
+- This is the I have you and will move you as I please
+- Types are readily available and it makes life simple
+
+```scala
+def map[A,B](l: ListC[A])(f: A => B): ListC[B]
+```
+
+- Such That
+
+```scala
+map(ListC(1,2,3))(_ * 10) == ListC(10,20,30)
+map(ListC(1,2,3))(_.toString) == ListC("1","2","3")
+```
+
+- Since foldRight builds Lists so well.
+- Let's use foldRight to transform elements.
+
+---
+# Map
+
+- Implementation
+
+```scala
+def map[A,B](l: ListC[A])(f: A => B): ListC[B] =
+  foldRight(l)(ListC[B]())((a,b) => Nel(f(a), b))
+```
+
+- Test
+
+```scala
+scala> map(ListC(1,2,3))(_ * 10) == ListC(10,20,30)
+res34: Boolean = true
+
+scala> map(ListC(1,2,3))(_.toString) == ListC("1","2","3")
+res35: Boolean = true
+```
+
+---
+# Filter
+
+```scala
+def filter[A](l: ListC[A])(f: A => Boolean): ListC[A]
+```
+
+Such That
+
+```scala
+filter(ListC(1,2,3,4,5))(_ >=4 ) == ListC(4,5)
+filter(ListC(1,2,3,4,5))(_ % 2 == 0) == ListC(2,4)
+```
+
+---
+# Filter
+
+- Implementation
+
+```scala
+scala> def filter[A](l: ListC[A])(f: A => Boolean): ListC[A] = reverse{
+     |   foldLeft(l)(ListC[A]())((b : ListC[A], a: A) => f(a) match {
+     |     case true => Nel(a,b)
+     |     case false => b
+     |   })
+     | }
+filter: [A](l: ListC[A])(f: A => Boolean)ListC[A]
+```
+
+- Testing
+
+```scala
+scala> filter(ListC(1,2,3,4,5))(_ >=4 ) == ListC(4,5)
+res36: Boolean = true
+
+scala> filter(ListC(1,2,3,4,5))(_ % 2 == 0) == ListC(2,4)
+res37: Boolean = true
+```
+
+---
+#FlatMap
+
+- AKA: Functional Effects
+
+```scala
+def flatMap[A,B](l: ListC[A])(f: A => ListC[B]): ListC[B]
+```
+
+Such that
+
+```scala
+flatMap(ListC(1,2,3))(value =>
+  ListC(value*2, value * 10)) == ListC(2, 10, 4, 20, 6, 30)
+```
+
+---
+# FlatMap
+
+- Implementation
+
+```scala
+def flatMap[A,B](l: ListC[A])(f: A => ListC[B]) =
+  flatten(map(l)(f))
+```
+
+- Testing
+
+```scala
+scala> flatMap(ListC(1,2,3))(value =>
+     |   ListC(value*2, value * 10)) == ListC(2, 10, 4, 20, 6, 30)
+res38: Boolean = true
+```
+
+---
+# Thanks All!
+
+- I hope you enjoyed the presentation. I have some fun stuff to work out
+from what was already covered here
+
+
+
+
+---
+
+
 
 
 </textarea>
