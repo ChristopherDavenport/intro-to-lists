@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Title</title>
+    <meta charset="utf-8">
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+      body { font-family: 'Droid Serif', 'Helvetica'; }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz', 'Gill Sans';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono', 'Consolas', 'Courier New'; }
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle
+
+# Intro To Lists and Data Structures
+Chris Davenport • `@davenpcm` • Eckerd College
+
+---
+
+# Lists
+
+1. Foundational Understanding
+2. Examine Reasoning By Types
+3. Build Our Own Version
+
+---
+
+# Basic List
+```tut:silent
+sealed trait List[+A]
+case object Nil extends List[Nothing]
+final case class Cons[+A](x: A, xs: List[A]) extends List[A]
+```
+
+
+</textarea>
+   <script src="remark-latest.min.js">
+   </script>
+   <script>
+     var slideshow = remark.create();
+   </script>
+ </body>
+</html>
